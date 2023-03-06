@@ -1,11 +1,14 @@
 from django.shortcuts import render
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.views import APIView
-from .serializers import UserSerializer, OverpassSerializer
 from rest_framework import response, decorators, permissions, status
+from .serializers import UserSerializer, OverpassSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from django.contrib.gis.geos import Point
+from rest_framework.views import APIView
+from shapely.geometry import Polygon
 import overpy
-import shapely.ge
+import json
 
 
 # view for registering users
@@ -88,3 +91,28 @@ class SearchMap(APIView):
                             geojson_feature["properties"][k] = v
 
                         geojson_result["features"].append(geojson_feature)
+
+                    for node in result.nodes:
+                        # Ignore nodes which are also in a 'way' as we will have already processed the 'way'.
+                        if node.id in nodes_in_way:
+                            continue
+                        geojson_feature = None
+                        geojson_feature = {
+                            "type": "Feature",
+                            "id": "",
+                            "geometry": "",
+                            "properties": {}
+                        }
+                        point = Point([float(node.lon), float(node.lat)])
+                        geojson_feature["id"] = f"node_{node.id}"
+                        geojson_feature["geometry"] = json.loads(point.geojson)
+                        geojson_feature["properties"] = {}
+                        for k, v in node.tags.items():
+                            geojson_feature["properties"][k] = v
+
+                        geojson_result["features"].append(geojson_feature)
+
+                # Return the complete GeoJSON structure.
+                return Response(geojson_result, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"message": f"Error: {e}."}, status=status.HTTP_400_BAD_REQUEST)

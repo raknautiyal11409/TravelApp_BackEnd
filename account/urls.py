@@ -13,5 +13,5 @@ urlpatterns = [
     path('api/login/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('api/register/', RegisterView.as_view(), name="sign_up"),
     path('api/login/verify/', TokenVerifyView.as_view(), name="token_verify"),
-    path('api/map_search', SearchMap.as_view(), name="search_map"),
+    path('map_search', SearchMap.as_view(), name="search_map"),
 ]
