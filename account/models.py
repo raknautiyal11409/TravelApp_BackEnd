@@ -49,34 +49,30 @@ class Location(models.Model):
     address = models.CharField(max_length=400)
     lonlat = gis_models.PointField(primary_key=True)
     usersPins = models.ManyToManyField(UserData, through='manage_locationPin_manytomany')
+    userFavourites = models.ManyToManyField(UserData, through='manageUserFavourites_manytomany', related_name='favourite_locations')
 
     def __str__(self):
         return self.name
+
+class manageUserFavourites_manytomany(models.Model):
+    userFavourites = models.ForeignKey(UserData, on_delete=models.CASCADE)
+    favouriteLocation = models.ForeignKey(Location, on_delete=models.PROTECT)
 
 class manage_locationPin_manytomany(models.Model):
     usersPins = models.ForeignKey(UserData, on_delete=models.CASCADE)
-    location = models.ForeignKey(Location, on_delete=models.CASCADE)
-
-
-class Favourite(models.Model):
-    name = models.CharField(max_length=200)
-    created_at = models.DateTimeField(auto_now_add=True)
-    location = models.OneToOneField(Location, on_delete=models.CASCADE)
-    user = models.ForeignKey(UserData, on_delete=models.CASCADE)
-
-    def __str__(self):
-        return self.name
+    pinLocation = models.ForeignKey(Location, on_delete=models.PROTECT)
 
 class BookmarkFolder(models.Model):
     folderID = models.AutoField(primary_key=True)
     name = models.CharField(max_length=200)
     created_at = models.DateTimeField(auto_now_add=True)
-    user = models.ForeignKey(UserData, on_delete=models.CASCADE)
+    user = models.ForeignKey(UserData, on_delete=models.PROTECT)
     location = models.ManyToManyField(Location, through='manage_bookmarkLocation_manytomany')
 
     def __str__(self):
         return self.name
 
 class manage_bookmarkLocation_manytomany(models.Model):
-    userBookmark = models.ForeignKey(BookmarkFolder, on_delete=models.CASCADE)
-    location = models.ForeignKey(Location, on_delete=models.CASCADE)
+    userBookmark = models.ForeignKey(BookmarkFolder, on_delete=models.PROTECT)
+    location = models.ForeignKey(Location, on_delete=models.PROTECT)
+

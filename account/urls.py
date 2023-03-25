@@ -4,7 +4,11 @@ from .views import (RegisterView,
                     addBookmarFolder,
                     getBookmarkFoldersOrderedByDate,
                     addBookmark,
-                    getFolderContent)
+                    getFolderContent,
+                    addPinLocation,
+                    addFavoutriteLocation,
+                    getPinLocations,
+                    getFavLocations)
 from rest_framework_simplejwt.views import (
     TokenObtainPairView,
     TokenRefreshView,
@@ -21,4 +25,8 @@ urlpatterns = [
     path('api/get_Folder_Names/', getBookmarkFoldersOrderedByDate.as_view(), name="gwt_addedFolders"),
     path('api/add_location_to_folder/', addBookmark.as_view(), name="add_bookmarkLocation"),
     path('api/getLocationsInFolder/', getFolderContent.as_view(), name="getLocationsInFolder"),
+    path('api/addPinLocation/', addPinLocation.as_view(), name="addPinLocation"),
+    path('api/addFavouriteLocation/', addFavoutriteLocation.as_view(), name="addFavLocation"),
+    path('api/getPins/', getPinLocations.as_view(), name="getPins"),
+    path('api/getFavs/', getFavLocations.as_view(), name="getFavs"),
 ]

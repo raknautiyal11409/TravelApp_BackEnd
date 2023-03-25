@@ -74,3 +74,15 @@ class addBookmarkSerializer(serializers.Serializer):
 
         return results
 
+class add_Pin_and_Favourite_Serializer(serializers.Serializer):
+
+    def to_internal_value(self, data):
+        results = {}
+        results["location_name"] = data["location_name"]
+        results["address"] = data["address"]
+        results["long"] = data["long"]
+        results["lat"] = data["lat"]
+
+        return results
+
+

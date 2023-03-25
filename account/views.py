@@ -1,12 +1,12 @@
 from django.shortcuts import render
 from rest_framework import response, decorators, permissions, status
-from .serializers import UserSerializer, OverpassSerializer, bookmarkFolderSerializer, addBookmarkSerializer, folderContentSrealizer
+from .serializers import UserSerializer, OverpassSerializer, bookmarkFolderSerializer, addBookmarkSerializer, folderContentSrealizer, add_Pin_and_Favourite_Serializer
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.permissions import IsAuthenticated
 from django.contrib.gis.geos import Point, Polygon
 from rest_framework.views import APIView
-from .models import BookmarkFolder, Location, UserData, Favourite
+from .models import BookmarkFolder, Location, UserData
 from django.contrib.gis.geos import Point
 from decimal import Decimal
 import overpy
@@ -144,13 +144,13 @@ class addBookmark(APIView):
 
     def post(self, request):
         try:
-            my_serialiser = addBookmarkSerializer(data=request.data)
+            my_serializer = addBookmarkSerializer(data=request.data)
 
-            if my_serialiser.is_valid():
-                name = my_serialiser.validated_data["location_name"]
-                address = my_serialiser.validated_data["address"]
-                longlat = Point(float(my_serialiser.validated_data["lat"]), float(my_serialiser.validated_data["long"]))
-                folderId = my_serialiser.validated_data["folderID"]
+            if my_serializer.is_valid():
+                name = my_serializer.validated_data["location_name"]
+                address = my_serializer.validated_data["address"]
+                longlat = Point(float(my_serializer.validated_data["lat"]), float(my_serializer.validated_data["long"]))
+                folderId = my_serializer.validated_data["folderID"]
 
                 location, created = Location.objects.get_or_create(
                     name=name,
@@ -185,47 +185,133 @@ class getFolderContent(APIView):
 
     def post(self, request):
         try:
-            my_serialiser = folderContentSrealizer(data=request.data)
-            locationResults = {
-                "name" : "",
-                "address" : "",
-                "lng":"",
-                "lat":""
-            }
+            my_serializer = folderContentSrealizer(data=request.data)
 
-            if my_serialiser.is_valid():
-                folderID = my_serialiser.validated_data
+            locationResults =[]
+
+
+            if my_serializer.is_valid():
+                folderID = my_serializer.validated_data
                 bookmark_folder = BookmarkFolder.objects.prefetch_related('location').get(folderID=folderID)
                 locations = bookmark_folder.location.all().values('name', 'address', 'lonlat')
                 for location in locations:
-                    locationResults['name'] = location['name']
-                    locationResults['address'] = location['address']
-                    locationResults['lat'],locationResults['lng'] = location['lonlat'].coords
+
+                    lat, long = location['lonlat'].coords
+                    Result = {
+                        "name":  location['name'],
+                        "address": location['address'],
+                        "lng": long,
+                        "lat": lat
+                    }
+                    locationResults.append(Result)
                 return response.Response(locationResults, status=status.HTTP_200_OK)
         except Exception as e:
             return response.Response({"message": f"Error: {e}."}, status=status.HTTP_400_BAD_REQUEST)
 
 
 
-# view to add location
+class addFavoutriteLocation(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+    serializer_class = add_Pin_and_Favourite_Serializer
 
-# view to add favourite
+    def post(self, request):
+        try:
+            my_serializer = add_Pin_and_Favourite_Serializer(data=request.data)
 
-# @login_required
-# def update_database(request):
-#     my_location = request.POST.get("point", None)  # store the data in the incoming request
-#     if not my_location:
-#         return JsonResponse({"message": "No location found."}, status=400)
-#
-#     try:
-#         my_coords = [float(coord) for coord in my_location.split(", ")]
-#         my_profile = request.user.profile   # get user profile
-#         my_profile.last_location = Point(my_coords)
-#         my_profile.save()  # save the location in the database
-#
-#         message = f"Updated {request.user.username} with {f'POINT({my_location})'}"
-#
-#         # return success message
-#         return JsonResponse({"message": message}, status=200)
-#     except:
-#         return JsonResponse({"message": "No profile found."}, status=400)
+            if my_serializer.is_valid():
+                name = my_serializer.validated_data["location_name"]
+                address = my_serializer.validated_data["address"]
+                longlat = Point(float(my_serializer.validated_data["lat"]), float(my_serializer.validated_data["long"]))
+                user = request.user
+
+                location, created = Location.objects.get_or_create(
+                    name=name,
+                    address=address,
+                    lonlat=longlat
+                )
+
+                location.userFavourites.add(user)
+
+                return response.Response({"message": f"Success: Added Location to Folder."}, status=status.HTTP_200_OK)
+
+        except Exception as e:
+                return response.Response({"message": f"Error: {e}."}, status=status.HTTP_400_BAD_REQUEST)
+
+class addPinLocation(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+    serializer_class = add_Pin_and_Favourite_Serializer
+
+    def post(self, request):
+        try:
+            my_serializer = add_Pin_and_Favourite_Serializer(data=request.data)
+
+            if my_serializer.is_valid():
+                name = my_serializer.validated_data["location_name"]
+                address = my_serializer.validated_data["address"]
+                longlat = Point(float(my_serializer.validated_data["lat"]), float(my_serializer.validated_data["long"]))
+                user = request.user
+
+                location, created = Location.objects.get_or_create(
+                    name=name,
+                    address=address,
+                    lonlat=longlat
+                )
+
+                location.usersPins.add(user)
+
+                return response.Response({"message": f"Success: Added Location to Folder."}, status=status.HTTP_200_OK)
+
+        except Exception as e:
+                return response.Response({"message": f"Error: {e}."}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class getPinLocations(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+    def post(self, request):
+        try:
+            locationResults = []
+
+            user = request.user
+            locations = Location.objects.filter(usersPins=user).values('name', 'address', 'lonlat')
+
+            for location in locations:
+                lat, long = location['lonlat'].coords
+                Result = {
+                    "name": location['name'],
+                    "address": location['address'],
+                    "lng": long,
+                    "lat": lat
+                }
+                locationResults.append(Result)
+            return response.Response(locationResults, status=status.HTTP_200_OK)
+        except Exception as e:
+            return response.Response({"message": f"Error: {e}."}, status=status.HTTP_400_BAD_REQUEST)
+
+class getFavLocations(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+    def post(self, request):
+        try:
+            locationResults = []
+
+            user = request.user
+            locations = Location.objects.filter(userFavourites=user).values('name', 'address', 'lonlat')
+
+            for location in locations:
+                lat, long = location['lonlat'].coords
+                Result = {
+                    "name": location['name'],
+                    "address": location['address'],
+                    "lng": long,
+                    "lat": lat
+                }
+                locationResults.append(Result)
+            return response.Response(locationResults, status=status.HTTP_200_OK)
+        except Exception as e:
+            return response.Response({"message": f"Error: {e}."}, status=status.HTTP_400_BAD_REQUEST)
+
+
+
