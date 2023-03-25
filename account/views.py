@@ -1,12 +1,14 @@
 from django.shortcuts import render
 from rest_framework import response, decorators, permissions, status
-from .serializers import UserSerializer, OverpassSerializer
+from .serializers import UserSerializer, OverpassSerializer, bookmarkFolderSerializer, addBookmarkSerializer, folderContentSrealizer
 from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.permissions import IsAuthenticated
-from rest_framework.response import Response
-from django.contrib.gis.geos import Point
+from django.contrib.gis.geos import Point, Polygon
 from rest_framework.views import APIView
-from shapely.geometry import Polygon
+from .models import BookmarkFolder, Location, UserData, Favourite
+from django.contrib.gis.geos import Point
+from decimal import Decimal
 import overpy
 import json
 
@@ -28,7 +30,7 @@ class RegisterView(APIView):
 
 # view for registering users
 class SearchMap(APIView):
-    permission_classes = [IsAuthenticated]
+    # permission_classes = [IsAuthenticated]
     serializer_class = OverpassSerializer
 
     def post(self, request, *args, **kwargs):
@@ -36,13 +38,14 @@ class SearchMap(APIView):
             api = overpy.Overpass()
             api_query_top = \
                 """
-                [out:json][timeout:25]
+                [out:json][timeout:25];
                 (
                 """
+
             api_query_bottom = \
                 """
                 );
-                out body;
+                out center;
                 >;
                 out skel qt;
                 """
@@ -53,7 +56,7 @@ class SearchMap(APIView):
                 for item in my_serializer.validated_data["query"]:
                     if item == "*":
                         api_middle += f'node["amenity"]{tuple(bbox)};\nway["amenity"]{tuple(bbox)};\nrelation["amenity"]{tuple(bbox)};'
-                        break;
+                        break
                     else:
                         api_middle += f'node["amenity"="{item}"]{tuple(bbox)};\nway["amenity"="{item}"]{tuple(bbox)};\nrelation["amenity"="{item}"]{tuple(bbox)};'
 
@@ -113,6 +116,116 @@ class SearchMap(APIView):
                         geojson_result["features"].append(geojson_feature)
 
                 # Return the complete GeoJSON structure.
-                return Response(geojson_result, status=status.HTTP_200_OK)
+                return response.Response(geojson_result, status=status.HTTP_200_OK)
         except Exception as e:
-            return Response({"message": f"Error: {e}."}, status=status.HTTP_400_BAD_REQUEST)
+            return response.Response({"message": f"Error: {e}."}, status=status.HTTP_400_BAD_REQUEST)
+
+# view to add bookmark folder
+class addBookmarFolder(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+    serializer_class = bookmarkFolderSerializer
+    def post(self, request):
+        try:
+            my_serializer = bookmarkFolderSerializer(data=request.data)
+
+            if my_serializer.is_valid():
+                name = my_serializer.validated_data
+                user = request.user
+                bookmark_folder = BookmarkFolder.objects.create(name=name, user=user)
+                return response.Response({"message" : f"Success: Added folder." }, status=status.HTTP_200_OK)
+        except Exception as e:
+            return response.Response({"message": f"Error: {e}."}, status=status.HTTP_400_BAD_REQUEST)
+
+class addBookmark(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+    serializer_class = addBookmarkSerializer
+
+    def post(self, request):
+        try:
+            my_serialiser = addBookmarkSerializer(data=request.data)
+
+            if my_serialiser.is_valid():
+                name = my_serialiser.validated_data["location_name"]
+                address = my_serialiser.validated_data["address"]
+                longlat = Point(float(my_serialiser.validated_data["lat"]), float(my_serialiser.validated_data["long"]))
+                folderId = my_serialiser.validated_data["folderID"]
+
+                location, created = Location.objects.get_or_create(
+                    name=name,
+                    address=address,
+                    lonlat=longlat
+                )
+
+                bookmark_folder = BookmarkFolder.objects.get(folderID=folderId)
+
+                bookmark_folder.location.add(location)
+
+                return response.Response({"message": f"Success: Added Location to Folder."}, status=status.HTTP_200_OK)
+        except Exception as e:
+                return response.Response({"message": f"Error: {e}."}, status=status.HTTP_400_BAD_REQUEST)
+
+class getBookmarkFoldersOrderedByDate(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        try:
+            user = request.user
+            bookmarkFolderNames = BookmarkFolder.objects.filter(user=user).order_by('-created_at').values('name', 'folderID')
+            return response.Response(bookmarkFolderNames, status=status.HTTP_200_OK)
+        except Exception as e:
+            return response.Response({"message": f"Error: {e}."}, status=status.HTTP_400_BAD_REQUEST)
+
+class getFolderContent(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+    serializer_class = folderContentSrealizer
+
+    def post(self, request):
+        try:
+            my_serialiser = folderContentSrealizer(data=request.data)
+            locationResults = {
+                "name" : "",
+                "address" : "",
+                "lng":"",
+                "lat":""
+            }
+
+            if my_serialiser.is_valid():
+                folderID = my_serialiser.validated_data
+                bookmark_folder = BookmarkFolder.objects.prefetch_related('location').get(folderID=folderID)
+                locations = bookmark_folder.location.all().values('name', 'address', 'lonlat')
+                for location in locations:
+                    locationResults['name'] = location['name']
+                    locationResults['address'] = location['address']
+                    locationResults['lat'],locationResults['lng'] = location['lonlat'].coords
+                return response.Response(locationResults, status=status.HTTP_200_OK)
+        except Exception as e:
+            return response.Response({"message": f"Error: {e}."}, status=status.HTTP_400_BAD_REQUEST)
+
+
+
+# view to add location
+
+# view to add favourite
+
+# @login_required
+# def update_database(request):
+#     my_location = request.POST.get("point", None)  # store the data in the incoming request
+#     if not my_location:
+#         return JsonResponse({"message": "No location found."}, status=400)
+#
+#     try:
+#         my_coords = [float(coord) for coord in my_location.split(", ")]
+#         my_profile = request.user.profile   # get user profile
+#         my_profile.last_location = Point(my_coords)
+#         my_profile.save()  # save the location in the database
+#
+#         message = f"Updated {request.user.username} with {f'POINT({my_location})'}"
+#
+#         # return success message
+#         return JsonResponse({"message": message}, status=200)
+#     except:
+#         return JsonResponse({"message": "No profile found."}, status=400)

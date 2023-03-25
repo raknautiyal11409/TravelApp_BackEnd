@@ -46,3 +46,31 @@ class OverpassSerializer(serializers.Serializer):
             internal_rep["bbox"] = mod_box
 
         return internal_rep
+
+class bookmarkFolderSerializer(serializers.Serializer):
+
+    def to_internal_value(self, data):
+        name = data["name"]
+
+        return name
+
+
+class folderContentSrealizer(serializers.Serializer):
+
+    def to_internal_value(self, data):
+        folderID = data['folderID']
+
+        return folderID
+
+class addBookmarkSerializer(serializers.Serializer):
+
+    def to_internal_value(self, data):
+        results = {}
+        results["location_name"] = data["location_name"]
+        results["address"] = data["address"]
+        results["long"] = data["long"]
+        results["lat"] = data["lat"]
+        results["folderID"] = data["folderID"]
+
+        return results
+

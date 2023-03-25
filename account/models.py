@@ -1,6 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser, BaseUserManager
-
+from django.contrib.gis.db import models as gis_models
 # Create your models here.
 class UserManager(BaseUserManager):
     use_in_migration = True
@@ -43,3 +43,40 @@ class UserData(AbstractUser):
 
     def __str__(self):
         return self.name
+
+class Location(models.Model):
+    name = models.CharField(max_length=200)
+    address = models.CharField(max_length=400)
+    lonlat = gis_models.PointField(primary_key=True)
+    usersPins = models.ManyToManyField(UserData, through='manage_locationPin_manytomany')
+
+    def __str__(self):
+        return self.name
+
+class manage_locationPin_manytomany(models.Model):
+    usersPins = models.ForeignKey(UserData, on_delete=models.CASCADE)
+    location = models.ForeignKey(Location, on_delete=models.CASCADE)
+
+
+class Favourite(models.Model):
+    name = models.CharField(max_length=200)
+    created_at = models.DateTimeField(auto_now_add=True)
+    location = models.OneToOneField(Location, on_delete=models.CASCADE)
+    user = models.ForeignKey(UserData, on_delete=models.CASCADE)
+
+    def __str__(self):
+        return self.name
+
+class BookmarkFolder(models.Model):
+    folderID = models.AutoField(primary_key=True)
+    name = models.CharField(max_length=200)
+    created_at = models.DateTimeField(auto_now_add=True)
+    user = models.ForeignKey(UserData, on_delete=models.CASCADE)
+    location = models.ManyToManyField(Location, through='manage_bookmarkLocation_manytomany')
+
+    def __str__(self):
+        return self.name
+
+class manage_bookmarkLocation_manytomany(models.Model):
+    userBookmark = models.ForeignKey(BookmarkFolder, on_delete=models.CASCADE)
+    location = models.ForeignKey(Location, on_delete=models.CASCADE)
