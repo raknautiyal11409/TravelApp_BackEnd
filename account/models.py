@@ -55,11 +55,11 @@ class Location(models.Model):
         return self.name
 
 class manageUserFavourites_manytomany(models.Model):
-    userFavourites = models.ForeignKey(UserData, on_delete=models.CASCADE)
+    userFavourites = models.ForeignKey(UserData, on_delete=models.PROTECT)
     favouriteLocation = models.ForeignKey(Location, on_delete=models.PROTECT)
 
 class manage_locationPin_manytomany(models.Model):
-    usersPins = models.ForeignKey(UserData, on_delete=models.CASCADE)
+    usersPins = models.ForeignKey(UserData, on_delete=models.PROTECT)
     pinLocation = models.ForeignKey(Location, on_delete=models.PROTECT)
 
 class BookmarkFolder(models.Model):

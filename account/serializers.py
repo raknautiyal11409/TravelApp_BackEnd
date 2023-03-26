@@ -2,6 +2,7 @@ import string
 
 from rest_framework import serializers
 from .models import UserData
+from django.contrib.gis.geos import Point
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -85,4 +86,18 @@ class add_Pin_and_Favourite_Serializer(serializers.Serializer):
 
         return results
 
+class removeBookmarkFromFolderSerialzer(serializers.Serializer):
 
+    def to_internal_value(self, data):
+        results = {}
+        results['folderID'] = data['folderID']
+        results['location'] = Point(float(data["lat"]), float(data["long"]))
+
+        return results
+
+class locationSerialzer(serializers.Serializer):
+
+    def to_internal_value(self, data):
+        result = Point(float(data["lat"]), float(data["long"]))
+
+        return result

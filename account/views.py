@@ -1,6 +1,8 @@
 from django.shortcuts import render
 from rest_framework import response, decorators, permissions, status
-from .serializers import UserSerializer, OverpassSerializer, bookmarkFolderSerializer, addBookmarkSerializer, folderContentSrealizer, add_Pin_and_Favourite_Serializer
+from .serializers import (UserSerializer, OverpassSerializer, bookmarkFolderSerializer,
+                          addBookmarkSerializer, folderContentSrealizer, add_Pin_and_Favourite_Serializer,
+                          removeBookmarkFromFolderSerialzer, locationSerialzer)
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.permissions import IsAuthenticated
@@ -8,6 +10,7 @@ from django.contrib.gis.geos import Point, Polygon
 from rest_framework.views import APIView
 from .models import BookmarkFolder, Location, UserData
 from django.contrib.gis.geos import Point
+from django.shortcuts import get_object_or_404
 from decimal import Decimal
 import overpy
 import json
@@ -312,6 +315,97 @@ class getFavLocations(APIView):
             return response.Response(locationResults, status=status.HTTP_200_OK)
         except Exception as e:
             return response.Response({"message": f"Error: {e}."}, status=status.HTTP_400_BAD_REQUEST)
+
+class removeBookmarkFromFolder(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+    serializer_class = removeBookmarkFromFolderSerialzer
+
+    def post(self, request):
+        try:
+            my_serializer = removeBookmarkFromFolderSerialzer(data=request.data)
+
+            if my_serializer.is_valid():
+                bookmarkFolder = BookmarkFolder.objects.get(folderID=my_serializer.validated_data['folderID'])
+                longlat = Location.objects.get(lonlat=my_serializer.validated_data['location'])
+
+                bookmarkFolder.location.remove(longlat)
+
+            return response.Response({"message": f"Success: Removed location from folder."}, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return response.Response({"message": f"Error: {e}."}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class removeFavourite(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+    serializer_class = locationSerialzer
+
+    def post(self, request):
+        try:
+            my_serializer = locationSerialzer(data=request.data)
+
+            if my_serializer.is_valid():
+                user = request.user
+                longlat = Location.objects.get(lonlat=my_serializer.validated_data)
+
+                longlat.userFavourites.remove(user)
+
+            return response.Response({"message": f"Success: Removed location from favourites."}, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return response.Response({"message": f"Error: {e}."}, status=status.HTTP_400_BAD_REQUEST)
+
+class removePin(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+    serializer_class = locationSerialzer
+
+    def post(self, request):
+        try:
+            my_serializer = locationSerialzer(data=request.data)
+
+            if my_serializer.is_valid():
+                user = request.user
+                longlat = Location.objects.get(lonlat=my_serializer.validated_data)
+
+                longlat.usersPins.remove(user)
+
+            return response.Response({"message": f"Success: Removed location from favourites."}, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return response.Response({"message": f"Error: {e}."}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class removeBookmarkFolder(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+    serializer_class = folderContentSrealizer
+
+    def post(self, request):
+        try:
+            my_serialiser = folderContentSrealizer(data=request.data)
+
+            if my_serialiser.is_valid():
+                bookmarkFolder = get_object_or_404(BookmarkFolder, folderID=my_serialiser.validated_data)
+
+                bookmarkFolder.location.clear()
+
+                bookmarkFolder.delete()
+
+                return response.Response({"message": f"Success: Removed folder."}, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return response.Response({"message": f"Error: {e}."}, status=status.HTTP_400_BAD_REQUEST)
+
+
+
+
+
+
+
+
 
 
 
