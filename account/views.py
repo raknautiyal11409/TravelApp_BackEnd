@@ -5,6 +5,8 @@ from .serializers import (UserSerializer, OverpassSerializer, bookmarkFolderSeri
                           removeBookmarkFromFolderSerialzer, locationSerialzer)
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.authentication import JWTAuthentication
+from rest_framework_simplejwt.tokens import OutstandingToken, BlacklistedToken
+from django.contrib.auth import logout
 from rest_framework.permissions import IsAuthenticated
 from django.contrib.gis.geos import Point, Polygon
 from rest_framework.views import APIView
@@ -400,10 +402,24 @@ class removeBookmarkFolder(APIView):
             return response.Response({"message": f"Error: {e}."}, status=status.HTTP_400_BAD_REQUEST)
 
 
+class logoutVIEW(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
 
+    def post(self, request):
+        try:
+            logout(request) # log the user out
+            refreshToken = request.data['refreshToken']
 
+            try:
+                rToken =  OutstandingToken.objects.get(token=refreshToken)
+                rToken.blacklist()
+            except BlacklistedToken:
+                pass
 
-
+            return response.Response({"message": f"Logged out user."}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return response.Response({"message": f"Error: {e}."}, status=status.HTTP_400_BAD_REQUEST)
 
 
 
