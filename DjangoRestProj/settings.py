@@ -10,17 +10,17 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/4.1/ref/settings/
 """
 import os
+import socket
 from pathlib import Path
 from datetime import timedelta
+from decouple import config
+import dj_database_url
+
+os.environ['PROJ_LIB'] = f"{os.environ.get('CONDA_PREFIX', '')}/share/proj"
+os.environ['GDAL_DATA'] = f"{os.environ.get('CONDA_PREFIX', '')}/share"
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/4.1/howto/deployment/checklist/
-
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-y)*&z+q-2vt9)+vn#hn4rsz0^-2g*m5*zbcz1ailp7_^j8nt2m'
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -28,12 +28,6 @@ CSRF_COOKIE_SECURE = False
 SESSION_COOKIE_SECURE = False
 
 # allow font end to make request to the backend
-CORS_ORIGIN_ALLOW_ALL = True
-
-CORS_ALLOW_METHODS = [
-    'GET',
-    'POST',
-]
 
 ALLOWED_HOSTS = []
 
@@ -73,7 +67,7 @@ ROOT_URLCONF = 'DjangoRestProj.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [BASE_DIR / "templates"],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -88,19 +82,66 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'DjangoRestProj.wsgi.application'
 
+CORS_ORIGIN_WHITELIST = [
+    'https://mytravelapp.xyz',
+]
+
+SECRET_KEY = config('SECRET_KEY', default=None)
+DEPLOY_SECURE = config('DEPLOY_SECURE', default=False, cast=bool)
+
+# Database set up pointing to the spatial database
+if os.environ.get('CONDA_PREFIX', '').startswith('/opt'):
+    DATABASES = {'default': config('DATABASE_DOCKER', default=None, cast=dj_database_url.parse)}
+else:
+    DATABASES = {'default': config('DATABASE_LOCAL', default=None, cast=dj_database_url.parse)}
+
+if socket.gethostname() =="DESKTOP-ESFP3PK":
+    DATABASES["default"]["HOST"] = "localhost"
+    DATABASES["default"]["PORT"] = 25432
+else:
+    DATABASES["default"]["HOST"] = "wmap-postgis"
+    DATABASES["default"]["PORT"] = 5432
+
+# Set DEPLOY_SECURE to True only for LIVE deployment
+if DEPLOY_SECURE:
+    DEBUG = False
+    TEMPLATES[0]["OPTIONS"]["debug"] = False
+    ALLOWED_HOSTS = ['.mytravelapp.xyz', 'localhost', ]
+    CSRF_COOKIE_SECURE = True
+    SESSION_COOKIE_SECURE = True
+else:
+    DEBUG = True
+    TEMPLATES[0]["OPTIONS"]["debug"] = True
+    ALLOWED_HOSTS = ['*', ]
+    # CORS_ORIGIN_ALLOW_ALL = True
+    CSRF_COOKIE_SECURE = False
+    SESSION_COOKIE_SECURE = False
+
 # Database
 # https://docs.djangoproject.com/en/4.1/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.contrib.gis.db.backends.postgis',
-        'NAME': 'gis',
-        'HOST': 'localhost',
-        'USER': 'docker',
-        'PASSWORD': 'docker',
-        'PORT': 25432,
+if os.environ.get('CONDA_PREFIX', '').startswith('/opt'):
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.contrib.gis.db.backends.postgis',
+            'HOST': 'awm_network_ps',
+            'NAME': 'gis',
+            'USER': 'docker',
+            'PASSWORD': 'docker',
+            'PORT': 5432
+        },
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.contrib.gis.db.backends.postgis',
+            'HOST': 'localhost',
+            'NAME': 'gis',
+            'USER': 'docker',
+            'PASSWORD': 'docker',
+            'PORT': 25432
+        },
+    }
 
 # Password validation
 # https://docs.djangoproject.com/en/4.1/ref/settings/#auth-password-validators
@@ -129,7 +170,7 @@ REST_FRAMEWORK = {
 }
 
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=30),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
     'ROTATE_REFRESH_TOKENS': True,
     'BLACKLIST_AFTER_ROTATION': True,
@@ -149,11 +190,12 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.1/howto/static-files/
 
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
+STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+STATIC_ROOT = os.path.join(BASE_DIR, "static")
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.1/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
-STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
-STATIC_ROOT = os.path.join(BASE_DIR, "static")
+

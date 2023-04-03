@@ -7,13 +7,13 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework_simplejwt.tokens import OutstandingToken, BlacklistedToken
 from django.contrib.auth import logout
+from rest_framework_simplejwt.exceptions import InvalidToken
 from rest_framework.permissions import IsAuthenticated
 from django.contrib.gis.geos import Point, Polygon
 from rest_framework.views import APIView
 from .models import BookmarkFolder, Location, UserData
 from django.contrib.gis.geos import Point
 from django.shortcuts import get_object_or_404
-from decimal import Decimal
 import overpy
 import json
 
@@ -21,16 +21,22 @@ import json
 # view for registering users
 class RegisterView(APIView):
     def post(self, request):
-        serializer = UserSerializer(data=request.data)
-        if not serializer.is_valid():
-            return response.Response(serializer.errors, status.HTTP_400_BAD_REQUEST)
-        user = serializer.save()
-        refresh = RefreshToken.for_user(user)
-        res = {
-            'refresh': str(refresh),
-            'access': str(refresh.access_token),
-        }
-        return response.Response(res, status.HTTP_201_CREATED)
+        try:
+            if(request.data['regCode'] == 'fyp@2301'):
+                serializer = UserSerializer(data=request.data)
+                if not serializer.is_valid():
+                    return response.Response(serializer.errors, status.HTTP_400_BAD_REQUEST)
+                user = serializer.save()
+                refresh = RefreshToken.for_user(user)
+                res = {
+                    'refresh': str(refresh),
+                    'access': str(refresh.access_token),
+                }
+                return response.Response(res, status.HTTP_201_CREATED)
+            else:
+                return response.Response({"message": f"Error: invalid signup token."}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return response.Response({"message": f"Error: {e}."}, status=status.HTTP_400_BAD_REQUEST)
 
 
 # view for registering users
@@ -408,16 +414,16 @@ class logoutVIEW(APIView):
 
     def post(self, request):
         try:
-            logout(request) # log the user out
             refreshToken = request.data['refreshToken']
 
             try:
-                rToken =  OutstandingToken.objects.get(token=refreshToken)
+                rToken =  RefreshToken(refreshToken)
                 rToken.blacklist()
             except BlacklistedToken:
                 pass
-
-            return response.Response({"message": f"Logged out user."}, status=status.HTTP_200_OK)
+            finally:
+                logout(request)
+                return response.Response({"message": f"Logged out user."}, status=status.HTTP_200_OK)
         except Exception as e:
             return response.Response({"message": f"Error: {e}."}, status=status.HTTP_400_BAD_REQUEST)
 
